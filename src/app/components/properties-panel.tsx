@@ -1,6 +1,68 @@
-import { useState } from 'react';
-import { ComponentInfo } from './settings-library';
+import { useState, useCallback } from 'react';
+import { ComponentInfo, ColorInfo } from './settings-library';
 import { Copy, Check, ChevronDown, ChevronRight, Circle, ToggleRight } from 'lucide-react';
+
+// CSS 변수 → 실제 rgba 값 매핑 (Sort UI 컬러 시스템)
+const varToRgba: Record<string, string> = {
+  'var(--background)': 'rgba(255, 255, 255, 1.00)',
+  'var(--foreground)': 'rgba(17, 17, 21, 1.00)',
+  'var(--card)': 'rgba(255, 255, 255, 1.00)',
+  'var(--card-foreground)': 'rgba(17, 17, 21, 1.00)',
+  'var(--popover)': 'rgba(255, 255, 255, 1.00)',
+  'var(--popover-foreground)': 'rgba(17, 17, 21, 1.00)',
+  'var(--primary)': 'rgba(67, 125, 252, 1.00)',
+  'var(--primary-foreground)': 'rgba(255, 255, 255, 1.00)',
+  'var(--secondary)': 'rgba(255, 255, 255, 1.00)',
+  'var(--secondary-foreground)': 'rgba(17, 17, 21, 1.00)',
+  'var(--muted)': 'rgba(39, 39, 42, 0.06)',
+  'var(--muted-foreground)': 'rgba(111, 111, 119, 1.00)',
+  'var(--accent)': 'rgba(67, 125, 252, 1.00)',
+  'var(--accent-foreground)': 'rgba(255, 255, 255, 1.00)',
+  'var(--destructive)': 'rgba(231, 67, 65, 1.00)',
+  'var(--destructive-foreground)': 'rgba(255, 255, 255, 1.00)',
+  'var(--border)': 'rgba(39, 39, 42, 0.15)',
+  'var(--input)': 'rgba(255, 255, 255, 1.00)',
+  'var(--input-background)': 'rgba(255, 255, 255, 1.00)',
+  'var(--ring)': 'rgba(101, 160, 253, 0.40)',
+  'var(--inverted)': 'rgba(39, 39, 42, 1.00)',
+  'var(--inverted-foreground)': 'rgba(255, 255, 255, 1.00)',
+  'var(--sidebar)': 'rgba(255, 255, 255, 1.00)',
+  'var(--sidebar-foreground)': 'rgba(78, 78, 85, 1.00)',
+  'var(--sidebar-primary)': 'rgba(67, 125, 252, 1.00)',
+  'var(--sidebar-border)': 'rgba(39, 39, 42, 0.10)',
+  'var(--chart-3)': 'rgba(79, 198, 96, 1.00)',
+  'var(--badge-blue-bg)': 'rgba(101, 160, 253, 0.1)',
+  'var(--badge-blue-text)': 'rgba(33, 71, 221, 1.00)',
+  'var(--badge-blue-border)': 'rgba(101, 160, 253, 0.3)',
+};
+
+function rgbaToHex(rgba: string): string {
+  const match = rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (!match) return rgba;
+  const r = parseInt(match[1]).toString(16).padStart(2, '0');
+  const g = parseInt(match[2]).toString(16).padStart(2, '0');
+  const b = parseInt(match[3]).toString(16).padStart(2, '0');
+  return `#${r}${g}${b}`.toUpperCase();
+}
+
+function resolveHex(value: string): string {
+  const resolved = varToRgba[value] || value;
+  return rgbaToHex(resolved);
+}
+
+function categorizeColors(colors: ColorInfo[]): Record<string, ColorInfo[]> {
+  const categories: Record<string, ColorInfo[]> = {};
+  for (const color of colors) {
+    let cat = 'Selection colors';
+    if (color.name.startsWith('bg/')) cat = 'Background colors';
+    else if (color.name.startsWith('border/')) cat = 'Border colors';
+    else if (color.name.startsWith('text/')) cat = 'Selection colors';
+    else if (color.name.startsWith('icon/')) cat = 'Selection colors';
+    if (!categories[cat]) categories[cat] = [];
+    categories[cat].push(color);
+  }
+  return categories;
+}
 
 interface PropertiesPanelProps {
   selectedComponent: ComponentInfo | null;
@@ -252,39 +314,67 @@ export function PropertiesPanel({ selectedComponent }: PropertiesPanelProps) {
             
             {isColorsExpanded && (
               <div>
-                <p style={{
-                  fontSize: 'var(--size-sm)',
-                  color: 'var(--muted-foreground)',
-                  marginBottom: '12px'
-                }}>
-                  Selection colors
-                </p>
-                <div className="space-y-2">
-                  {selectedComponent.colors.map((color, index) => (
-                    <div 
-                      key={index}
-                      className="flex items-center ds-gap-12 p-2 rounded"
-                      style={{ backgroundColor: 'var(--muted)' }}
-                    >
-                      <div 
-                        style={{
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '4px',
-                          backgroundColor: color.value,
-                          border: '1px solid var(--border)',
-                          flexShrink: 0
-                        }}
-                      />
-                      <span style={{
-                        fontSize: 'var(--size-sm)',
-                        color: 'var(--card-foreground)'
-                      }}>
-                        {color.name}
-                      </span>
+                {Object.entries(categorizeColors(selectedComponent.colors!)).map(([category, colors]) => (
+                  <div key={category} style={{ marginBottom: '16px' }}>
+                    <p style={{
+                      fontSize: 'var(--size-sm)',
+                      color: 'var(--muted-foreground)',
+                      marginBottom: '8px'
+                    }}>
+                      {category}
+                    </p>
+                    <div className="space-y-1">
+                      {colors.map((color, index) => {
+                        const hex = resolveHex(color.value);
+                        const colorKey = `color-${category}-${index}`;
+                        return (
+                          <button
+                            key={index}
+                            onClick={() => handleCopy(hex, colorKey)}
+                            className="flex items-center w-full rounded-md transition-colors hover:bg-muted"
+                            style={{
+                              padding: '8px 12px',
+                              border: '1px solid var(--border)',
+                              backgroundColor: copiedSection === colorKey ? 'var(--muted)' : 'var(--background)',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '6px',
+                                backgroundColor: color.value,
+                                border: '1px solid var(--border)',
+                                flexShrink: 0
+                              }}
+                            />
+                            <span style={{
+                              fontSize: 'var(--size-sm)',
+                              color: 'var(--card-foreground)',
+                              marginLeft: '12px',
+                              fontFamily: 'monospace',
+                              flex: 1,
+                              textAlign: 'left'
+                            }}>
+                              {color.name}
+                            </span>
+                            <span style={{
+                              fontSize: 'var(--size-xs)',
+                              color: 'var(--muted-foreground)',
+                              marginLeft: '8px',
+                              flexShrink: 0
+                            }}>
+                              {copiedSection === colorKey ? (
+                                <Check size={14} style={{ color: 'var(--chart-3)' }} />
+                              ) : hex}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
