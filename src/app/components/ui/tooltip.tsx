@@ -50,8 +50,8 @@ function TooltipContent({
           className,
         )}
         style={{
-          backgroundColor: 'var(--primary)',
-          color: 'var(--primary-foreground)',
+          backgroundColor: 'var(--inverted)',
+          color: 'var(--inverted-foreground)',
           borderRadius: 'var(--radius-tooltip)',
           fontFamily: 'var(--font-family-suit)',
           fontSize: 'var(--size-sm)',
@@ -60,10 +60,10 @@ function TooltipContent({
         {...props}
       >
         {children}
-        <TooltipPrimitive.Arrow 
-          className="z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px]" 
+        <TooltipPrimitive.Arrow
+          className="z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px]"
           style={{
-            fill: 'var(--primary)',
+            fill: 'var(--inverted)',
           }}
         />
       </TooltipPrimitive.Content>
